@@ -1,0 +1,339 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE rfc SYSTEM "rfc2629-xhtml.ent">
+<?xml-stylesheet type="text/xsl" href="rfc2629.xslt"?>
+
+<rfc
+ category="std"
+ docName="draft-haynes-nfsv4-recalldevice-VERSIONVAR"
+ ipr="trust200902"
+ obsoletes=""
+ scripts="Common,Latin"
+ sortRefs="true"
+ submissionType="IETF"
+ symRefs="true"
+ tocDepth="3"
+ tocInclude="true"
+ version="3"
+ xml:lang="en">
+
+<front>
+  <title abbrev="RECALL_DEVICE">
+    Add CB_LAYOUTRECLL_DEVICE to NFSv4.2
+  </title>
+  <seriesInfo name="Internet-Draft" value="draft-haynes-nfsv4-recalldevice-VERSIONVAR"/>
+  <author fullname="Thomas Haynes" initials="T." surname="Haynes">
+    <organization abbrev="Hammerspace">Hammerspace</organization>
+    <address>
+      <email>loghyr@hammerspace.com</email>
+    </address>
+  </author>
+  <date year="YEARVAR" month="MONTHVAR" day="DAYVAR"/>
+  <area>Transport</area>
+  <workgroup>Network File System Version 4</workgroup>
+  <keyword>NFSv4</keyword>
+  <abstract>
+    <t>
+      The Parallel Network File System (pNFS) allows for the metadata
+      server to use CB_LAYOUTRECALL to recall a layout from a client
+      by file id or file system id or all. It also allows the server to
+      use CB_NOTIFY_DEVICEID to delete a devicid. It does not provide
+      a mechanism for the metadata server to recall all layouts that
+      have a data file on a specific deviceid.  This document presents
+      an extension to RFC8881 to allow the server recall layouts from
+      clients based on deviceid.
+    </t>
+  </abstract>
+
+  <note removeInRFC="true">
+    <t>
+      Discussion of this draft takes place
+      on the NFSv4 working group mailing list (nfsv4@ietf.org),
+      which is archived at
+      <eref target="https://mailarchive.ietf.org/arch/browse/nfsv4/"/>.
+      Working Group information can be found at
+      <eref target="https://datatracker.ietf.org/wg/nfsv4/about/"/>.
+    </t>
+  </note>
+</front>
+
+<middle>
+
+<section anchor="sec_intro" numbered="true" removeInRFC="false" toc="default">
+  <name>Introduction</name>
+  <t>
+    In the Network File System version4 (NFSv4) with a Parallel NFS
+    (pNFS) metadata server (<xref target="RFC8881" format="default"
+    sectionFormat="of"/>), there is no mechanism for the metadata
+    server to recall layouts from the client for when a particular deviceid (see
+    Section 3.3.14 of <xref target="RFC8881" format="default"
+    sectionFormat="of"/>) either temporarily or permanently is no
+    longer available.
+  </t>
+
+  <t>
+    One use case is when the deviceids in a layout are separated by
+    power fault domains. Each layout might describe 3 different
+    devices, each contained in a different power fault domain. In
+    such a scenario, a single fault domain can have the power
+    removed and not cause the loss of access to the data.  However,
+    client I/O will be impacted as the client still has to perform
+    WRITEs (see Section 18.32 of <xref target="RFC8881" format="default"
+    sectionFormat="of"/>) to the unavailable device, send LAYOUTERRORs (see Section 15.6
+    of <xref target="RFC7862" format="default"
+    sectionFormat="of"/>) to inform the metadata server of NFS4ERR_NXIO (see
+    Section 15.1.16.3 of <xref target="RFC8881" format="default"
+    sectionFormat="of"/>).
+  </t>
+
+  <t>
+    If the metadata sever had the means to recall layouts by deviceid,
+    a lot of this unnecessary traffic could be eliminated. Finally,
+    while the metadata server could recall layouts one by one, this
+    is again unnecessary traffic and can be offloaded to the client.
+  </t>
+
+  <t>
+    Besides the use case above, consider if the metadata server wants to
+    set the NOTIFY4_DEVICEID_DELETE in the CB_NOTIFY_DEVICEID callback
+    (see Section 20.12 of <xref target="RFC8881" format="default"
+    sectionFormat="of"/>). This flag cannot be set if a layout is
+    outstanding for a deviceid. While the metadata server can revoke
+    all such layouts, there is no way to know that the client has
+    acknowledged that revocation and hence is still not doing I/O
+    to other data files in the layout. The metadata server could fence
+    those layouts as well (see Section 12.5.5 of <xref target="RFC8881"
+    format="default" sectionFormat="of"/>), but that can be an expensive
+    operation.
+  </t>
+
+  <t>
+    Using the process detailed in <xref target="RFC8178" format="default"
+    sectionFormat="of"/>, the revisions in this document become an
+    extension of NFSv4.2 <xref target="RFC7862" format="default"
+    sectionFormat="of"/>. They are built on top of the external data
+    representation (XDR) <xref target="RFC4506" format="default"
+    sectionFormat="of"/> generated from <xref target="RFC7863"
+    format="default" sectionFormat="of"/>.
+  </t>
+
+  <section anchor="need_flex_files" numbered="true" removeInRFC="true" toc="default">
+    <name>Do we need <xref target="RFC8435" format="default"
+       sectionFormat="of"/>?</name>
+    <t>
+      The authors have tried to introduce this new functionality outside
+      of a particular pNFS Layout Type. Does that work?
+    </t>
+  </section>
+
+  <section numbered="true" removeInRFC="false" toc="default">
+    <name>Requirements Language</name>
+    <t>
+      The key words "<bcp14>MUST</bcp14>", "<bcp14>MUST NOT</bcp14>",
+      "<bcp14>REQUIRED</bcp14>", "<bcp14>SHALL</bcp14>", "<bcp14>SHALL
+      NOT</bcp14>", "<bcp14>SHOULD</bcp14>", "<bcp14>SHOULD NOT</bcp14>",
+      "<bcp14>RECOMMENDED</bcp14>", "<bcp14>NOT RECOMMENDED</bcp14>",
+      "<bcp14>MAY</bcp14>", and "<bcp14>OPTIONAL</bcp14>" in this
+      document are to be interpreted as described in BCP&nbsp;14 <xref
+      target="RFC2119" format="default" sectionFormat="of"/> <xref
+      target="RFC8174" format="default" sectionFormat="of"/> when,
+      and only when, they appear in all capitals, as shown here.
+    </t>
+  </section>
+</section>
+
+<section anchor="op_CB_LAYOUTRECALL" numbered="true" removeInRFC="false" toc="default">
+  <name>Extension to Operation 5: CB_LAYOUTRECALL - Recall Layout from Client</name>
+  <t>
+    The original union layoutrecall4 (see Section 20.3.1 of <xref target="RFC8881" format="default"
+    sectionFormat="of"/>) is:
+  </t>
+
+  <sourcecode name="new_union_layoutrecall4" type="" markers="true"><![CDATA[
+enum layoutrecall_type4 {
+        LAYOUTRECALL4_FILE = LAYOUT4_RET_REC_FILE,
+        LAYOUTRECALL4_FSID = LAYOUT4_RET_REC_FSID,
+        LAYOUTRECALL4_ALL  = LAYOUT4_RET_REC_ALL
+};
+
+union layoutrecall4 switch(layoutrecall_type4 lor_recalltype) {
+   case LAYOUTRECALL4_FILE:
+           layoutrecall_file4 lor_layout;
+   case LAYOUTRECALL4_FSID:
+           fsid4              lor_fsid;
+   case LAYOUTRECALL4_ALL:
+           void;
+   };
+]]>
+  </sourcecode>
+
+  <t>
+    The proposed extension is:
+  </t>
+
+  <sourcecode name="new_union_layoutrecall4" type="" markers="true"><![CDATA[
+///    const LAYOUT4_RET_REC_ALL       = 4;
+///
+///    enum layoutrecall_type4 {
+///           LAYOUTRECALL4_FILE = LAYOUT4_RET_REC_FILE,
+///           LAYOUTRECALL4_FSID = LAYOUT4_RET_REC_FSID,
+///           LAYOUTRECALL4_ALL  = LAYOUT4_RET_REC_ALL,
+///           LAYOUTRECALL4_DEVICEID = LAYOUTRECALL4_RET_REC_DEVICEID
+///   };
+///
+/// union layoutrecall4 switch(layoutrecall_type4 lor_recalltype) {
+///   case LAYOUTRECALL4_FILE:
+///           layoutrecall_file4 lor_layout;
+///   case LAYOUTRECALL4_FSID:
+///           fsid4              lor_fsid;
+///   case LAYOUTRECALL4_DEVICEID:
+///           deviceid4          lor_deviceid;
+///   case LAYOUTRECALL4_ALL:
+///           void;
+///   };
+]]>
+  </sourcecode>
+
+  <t>
+    With this minimal change, all of the semantics of CB_LAYOUTRECALL in (see Section 20.3 of
+    <xref target="RFC8881" format="default" sectionFormat="of"/>) remain the same, i.e., the
+    client and server are aware of how CB_LAYOUTRECALL interacts with each other. The one
+    issue to investigated is what happens if a NFSv4.2 client sees a LAYOUTRECALL4_DEVICEID
+    in a CB_LAYOUTRECALL. They <bcp14>SHOULD</bcp14> return NFS4ERR_UNION_NOTSUPP, but the
+    implementations might not be compliant with <xref target="RFC8178" format="default"
+    sectionFormat="of"/>. As such, a survey should be conducted of the major implementations.
+  </t>
+
+  <t>
+    Finally, when the client does handle a LAYOUTRECALL4_DEVICEID in a CB_LAYOUTRECALL, it
+    <bcp14>MUST</bcp14> return all layouts which have a given deviceid.  The server can
+    determine that the client no longer has any layouts with the given devicedid
+    once the client replies with NFS4ERR_NOMATCHING_LAYOUT.
+  </t>
+</section>
+
+<section anchor="xdr_desc" numbered="true" removeInRFC="false" toc="default">
+  <name>Extraction of XDR</name>
+  <t>
+    This document contains the external data representation (XDR)
+    <xref target="RFC4506" format="default" sectionFormat="of"/> description of the new open
+    flags for delegating the file to the client.
+    The XDR description is embedded in this
+    document in a way that makes it simple for the reader to extract
+    into a ready-to-compile form.  The reader can feed this document
+    into the following shell script to produce the machine readable
+    XDR description of the new flags:
+  </t>
+  <sourcecode name="" type="" markers="true"><![CDATA[
+#!/bin/sh
+grep '^ *///' $* | sed 's?^ */// ??' | sed 's?^ *///$??'
+    ]]>
+  </sourcecode>
+  <t>
+    That is, if the above script is stored in a file called "extract.sh", and
+    this document is in a file called "spec.txt", then the reader can do:
+  </t>
+  <sourcecode name="" type="" markers="true"><![CDATA[
+sh extract.sh < spec.txt > layout_wcc.x
+    ]]>
+  </sourcecode>
+  <t>
+    The effect of the script is to remove leading white space from each
+    line, plus a sentinel sequence of "///".  XDR descriptions with the
+    sentinel sequence are embedded throughout the document.
+  </t>
+  <t>
+    Note that the XDR code contained in this document depends on types
+    from the NFSv4.2 nfs4_prot.x file (generated from <xref target="RFC7863" format="default" sectionFormat="of"/>).
+    This includes both nfs types that end with a 4, such as offset4,
+    length4, etc., as well as more generic types such as uint32_t and
+    uint64_t.
+  </t>
+  <t>
+    While the XDR can be appended to that from <xref target="RFC7863" format="default" sectionFormat="of"/>,
+    the various code snippets belong in their respective areas of the
+    that XDR.
+  </t>
+  <section anchor="code_copyright" numbered="true" removeInRFC="false" toc="default">
+    <name>Code Components Licensing Notice</name>
+    <t>
+       Both the XDR description and the scripts used for extracting the
+       XDR description are Code Components as described in Section 4 of
+       <xref target="LEGAL" format="default" sectionFormat="of">"Legal
+       Provisions Relating to IETF Documents"</xref>.  These Code
+       Components are licensed according to the terms of that document.
+    </t>
+  </section>
+</section>
+
+<section anchor="sec_security" numbered="true" removeInRFC="false" toc="default">
+  <name>Security Considerations</name>
+  <t>
+    There are no new security considerations beyond those in
+    <xref target="RFC7862" format="default" sectionFormat="of"/>.
+  </t>
+</section>
+
+<section anchor="sec_iana" numbered="true" removeInRFC="false" toc="default">
+  <name>IANA Considerations</name>
+  <t>
+    IANA should use the current document (RFC-TBD) as the reference for the new entries.
+  </t>
+</section>
+
+</middle>
+
+<back>
+
+<references>
+  <name>References</name>
+
+  <references>
+  <name>Normative References</name>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.2119.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.4506.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.7862.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.7863.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.8174.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.8178.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.8434.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.8435.xml"/>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.8881.xml"/>
+
+  </references>
+
+  <references>
+  <name>Informative References</name>
+    <xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+       href="https://xml2rfc.tools.ietf.org/public/rfc/bibxml/reference.RFC.1813.xml"/>
+    <reference anchor="LEGAL" target="http://trustee.ietf.org/docs/IETF-Trust-License-Policy.pdf">
+      <front>
+        <title abbrev="Legal Provisions">Legal Provisions Relating to IETF Documents</title>
+        <author>
+          <organization>IETF Trust</organization>
+        </author>
+        <date month="November" year="2008"/>
+      </front>
+    </reference>
+  </references>
+</references>
+
+<section numbered="true" removeInRFC="false" toc="default">
+      <name>Acknowledgments</name>
+      <t>
+        Trond Myklebust and Paul Saab have were invloved in the initial requirements for
+        this functionality.
+      </t>
+    </section>
+
+</back>
+
+</rfc>
