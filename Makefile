@@ -1,14 +1,16 @@
-# Copyright (C) The IETF Trust (2019)
-#
+LIBDIR := lib
+INDEX_FORMAT := md
+include $(LIBDIR)/main.mk
 
-YEAR=`date +%Y`
-MONTH=`date +%B`
-DAY=`date +%d`
-VERS=00
-
-BASEDOC=draft-haynes-nfsv4-recalldevice
-
-all: $(BASEDOC)-$(VERS).xml
-
-$(BASEDOC)-$(VERS).xml: $(BASEDOC).xml
-	sed -e s/VERSIONVAR/${VERS}/g -e s/DAYVAR/${DAY}/g -e s/MONTHVAR/${MONTH}/g -e s/YEARVAR/${YEAR}/g < $(BASEDOC).xml > $@
+$(LIBDIR)/main.mk:
+ifneq (,$(shell grep "path *= *$(LIBDIR)" .gitmodules 2>/dev/null))
+	git submodule sync
+	git submodule update --init
+else
+ifneq (,$(wildcard $(ID_TEMPLATE_HOME)))
+	ln -s "$(ID_TEMPLATE_HOME)" $(LIBDIR)
+else
+	git clone -q --depth 10 -b main \
+	    https://github.com/martinthomson/i-d-template $(LIBDIR)
+endif
+endif

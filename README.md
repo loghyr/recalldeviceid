@@ -1,18 +1,23 @@
-This draft describes an extension to the NFSv42 protocol.
+This draft describes an extension to the NFSv4.2 protocol.
 
-In particular, it describes the ability to recall all layouts based on deviceid
+In particular, it describes the ability to recall all layouts based
+on a deviceid via a new LAYOUTRECALL4_DEVICEID case in CB_LAYOUTRECALL.
 
-http://www.ietf.org/html.charters/nfsv4-charter.html
-http://www.ietf.org/mail-archive/web/nfsv4/index.html
+Discussion of this draft takes place on the NFSv4 working group
+mailing list (nfsv4@ietf.org).
 
-NOTE: The drafts contained here may change after it is
-posted to the IETF site. The ITEF site is always the
-definitive authority on content.
+## Building
 
-Notes to build:
+This draft uses the [martinthomson/i-d-template](https://github.com/martinthomson/i-d-template)
+build system.  On first run, `make` will clone the template library into `lib/`.
 
-1. Bump the VERS in Makefile
+```
+make
+```
 
-2. Build
+To produce a specific output format:
 
-   > make
+```
+make draft-haynes-nfsv4-recalldevice.txt
+make draft-haynes-nfsv4-recalldevice.html
+```
