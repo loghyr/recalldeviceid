@@ -42,7 +42,7 @@ by file id or file system id or all. It also allows the server to
 use CB_NOTIFY_DEVICEID to delete a deviceid. It does not provide
 a mechanism for the metadata server to recall all layouts that
 have a data file on a specific deviceid.  This document presents
-an extension to RFC8881 to allow the server to recall layouts from
+an extension to RFC7862 to allow the server to recall layouts from
 clients based on deviceid.
 
 --- note_Note_to_Readers
