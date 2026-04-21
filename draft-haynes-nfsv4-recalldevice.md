@@ -101,7 +101,7 @@ from {{RFC7863}}.
 The authors have tried to introduce this new functionality outside
 of a particular pNFS Layout Type. Does that work?
 
-## Requirements Language
+# Requirements Language
 
 {::boilerplate bcp14-tagged}
 
@@ -218,3 +218,6 @@ the new entries.
 
 Trond Myklebust and Paul Saab were involved in the initial
 requirements for this functionality.
+
+Brian Pawlowski and Gorry Fairhurst helped guide
+this process.
